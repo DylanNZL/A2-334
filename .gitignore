@@ -49,3 +49,9 @@ Temporary Items
 # Word files
 *.doc
 *.docx
+
+#working files
+*.exe
+*.o
+*.out
+data_recieved.txt
