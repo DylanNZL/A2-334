@@ -51,6 +51,7 @@ using namespace std;
                         //the BUFFER_SIZE has to be at least big enough to receive the packet
 #define SEGMENT_SIZE 78
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
+#define SLEEP_TIME 1000 // Time in ms for the application to sleep for.
 
 WSADATA wsadata;
 const int ARG_COUNT=5;
@@ -177,8 +178,9 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("data_for_transmission.txt is now open for sending\n");
   }
-	while (1){
+	while (1) {
 	 	memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
+		// TODO: Convert to reading in 4 lines to send each time
 	 	if (!feof(fin)) {
 			fgets(send_buffer,SEGMENT_SIZE,fin); //get one line of data from the file
 			sprintf(temp_buffer,"PACKET %d ",counter);  //create packet header with Sequence number
@@ -188,13 +190,15 @@ int main(int argc, char *argv[]) {
 			// TODO: CRC on data.
 			printf("\n======================================================\n");
 			cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+			// TODO: send window
 			send_unreliably(s,send_buffer,(result->ai_addr)); //send the packet to the unreliable data channel
 		  // NOTE was originally 1, set to 1000 to make it send one packet every second
-			Sleep(1000);  // sleep for 1 millisecond
+			Sleep(SLEEP_TIME);  // sleep for 1 millisecond
 			//********************************************************************
 			//RECEIVE
 			//********************************************************************
 			addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
+			// TODO: Reveive ACK for window 
 			bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
 			//********************************************************************
 			//IDENTIFY server's IP address and port number.
