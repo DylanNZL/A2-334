@@ -51,7 +51,8 @@ using namespace std;
                         //the BUFFER_SIZE has to be at least big enough to receive the packet
 #define SEGMENT_SIZE 78
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
-#define SLEEP_TIME 1000 // Time in ms for the application to sleep for.
+#define SLEEP_TIME 500 // Time in ms for the application to sleep for.
+#define WINDOW_SIZE 4 // Size of window
 
 WSADATA wsadata;
 const int ARG_COUNT=5;
@@ -164,8 +165,9 @@ int main(int argc, char *argv[]) {
 	//*******************************************************************
 	//SEND A TEXT FILE
 	//*******************************************************************
-	int counter=0;
+	int counter = 0;
 	char temp_buffer[BUFFER_SIZE];
+	char window[WINDOW_SIZE][BUFFER_SIZE + 30]; // Window
 	FILE *fin=fopen("data_for_transmission.txt","rb"); //original
 	//In text mode, carriage return�linefeed combinations
 	//are translated into single linefeeds on input, and
@@ -179,57 +181,70 @@ int main(int argc, char *argv[]) {
 		printf("data_for_transmission.txt is now open for sending\n");
   }
 	while (1) {
+		if (!feof(fin)) {
 	 	memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
 		// TODO: Convert to reading in 4 lines to send each time
-	 	if (!feof(fin)) {
-			fgets(send_buffer,SEGMENT_SIZE,fin); //get one line of data from the file
-			sprintf(temp_buffer,"PACKET %d ",counter);  //create packet header with Sequence number
+		int packets;
+		for (packets = 0; packets < 4; packets++) {
+			if (feof(fin)) { break; }
+
+			fgets(temp_buffer,SEGMENT_SIZE,fin); // get one line of data from the file
+			unsigned int CRC = CRCpolynomial(temp_buffer);
+			sprintf(window[packets], "%d Packet %d %s\r\n", CRC, counter, temp_buffer);
+			printf("%s\n", window[packets]);
 			counter++;
-			strcat(temp_buffer,send_buffer);   //append data to packet header
-			strcpy(send_buffer,temp_buffer);   //the complete packet
-			// TODO: CRC on data.
-			printf("\n======================================================\n");
-			cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+		}
 			// TODO: send window
-			send_unreliably(s,send_buffer,(result->ai_addr)); //send the packet to the unreliable data channel
-		  // NOTE was originally 1, set to 1000 to make it send one packet every second
-			Sleep(SLEEP_TIME);  // sleep for 1 millisecond
-			//********************************************************************
-			//RECEIVE
-			//********************************************************************
-			addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
-			// TODO: Reveive ACK for window 
-			bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
-			//********************************************************************
-			//IDENTIFY server's IP address and port number.
-			//********************************************************************
-			char serverHost[NI_MAXHOST];
-	    char serverService[NI_MAXSERV];
-	    memset(serverHost, 0, sizeof(serverHost));
-	    memset(serverService, 0, sizeof(serverService));
-	    getnameinfo((struct sockaddr *)&remoteaddr, addrlen,
-	                  serverHost, sizeof(serverHost),
-	                  serverService, sizeof(serverService),
-	                  NI_NUMERICHOST);
-	    printf("\nReceived a packet of size %d bytes from <<<UDP Server>>> with IP address:%s, at Port:%s\n",bytes,serverHost, serverService);
-			//********************************************************************
-			//PROCESS REQUEST
-			//********************************************************************
-			//Remove trailing CR and LN
-			if( bytes != SOCKET_ERROR ) {
-				n=0;
-				while (n<bytes){
-					n++;
-					if ((bytes < 0) || (bytes == 0)) break;
-					if (receive_buffer[n] == '\n') { /*end on a LF*/
-						receive_buffer[n] = '\0';
-						break;
-					}
-					if (receive_buffer[n] == '\r') /*ignore CRs*/
-					receive_buffer[n] = '\0';
-				}
-				printf("RECEIVED --> %s, %d elements\n",receive_buffer, int(strlen(receive_buffer)));
+
+			for (int h = 0; h < packets; h++) {
+				strcpy(send_buffer, window[h]);
+				printf("\n======================================================\n");
+				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+				send_unreliably(s,send_buffer,(result->ai_addr)); //send the packet to the unreliable data channel
 			}
+
+			int recv_counter = 0;
+			while (true) {
+				// NOTE was originally 1, set to 1000 to make it send one packet every second
+				Sleep(SLEEP_TIME);  // sleep for 1 millisecond
+				// If we have recieved ACK for all packets continue
+				if (recv_counter == packets) { break; }
+				//********************************************************************
+				//RECEIVE
+				//********************************************************************
+				addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
+				// TODO: Reveive ACK for window
+				bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
+				//********************************************************************
+				//IDENTIFY server's IP address and port number.
+				//********************************************************************
+				char serverHost[NI_MAXHOST];
+				char serverService[NI_MAXSERV];
+				memset(serverHost, 0, sizeof(serverHost));
+				memset(serverService, 0, sizeof(serverService));
+				getnameinfo((struct sockaddr *)&remoteaddr, addrlen, serverHost, sizeof(serverHost), serverService, sizeof(serverService), NI_NUMERICHOST);
+				printf("\nReceived a packet of size %d bytes from <<<UDP Server>>> with IP address:%s, at Port:%s\n",bytes,serverHost, serverService);
+				//********************************************************************
+				//PROCESS REQUEST
+				//********************************************************************
+				//Remove trailing CR and LN
+				if( bytes != SOCKET_ERROR ) {
+					n=0;
+					while (n<bytes){
+						n++;
+						if ((bytes < 0) || (bytes == 0)) break;
+						if (receive_buffer[n] == '\n') { /*end on a LF*/
+							receive_buffer[n] = '\0';
+							break;
+						}
+						if (receive_buffer[n] == '\r') /*ignore CRs*/
+						receive_buffer[n] = '\0';
+					}
+					printf("RECEIVED --> %s, %d elements\n",receive_buffer, int(strlen(receive_buffer)));
+				}
+				recv_counter++;
+			}
+
 		} else {
 			fclose(fin);
 			printf("End-of-File reached. \n");
