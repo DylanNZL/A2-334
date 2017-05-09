@@ -189,7 +189,13 @@ int main(int argc, char *argv[]) {
 			if (feof(fin)) { break; }
 
 			fgets(temp_buffer,SEGMENT_SIZE,fin); // get one line of data from the file
+			strtok(temp_buffer, "'\r\n'");
 			unsigned int CRC = CRCpolynomial(temp_buffer);
+			// DEBUG:
+			printf("CRC: %d\n", CRC);
+			printf("PACKET: %d\n", counter);
+			printf("COMMAND: Packet\n");
+			printf("DATA: \"%s\"\n", temp_buffer);
 			sprintf(window[packets], "%d Packet %d %s\r\n", CRC, counter, temp_buffer);
 			printf("%s\n", window[packets]);
 			counter++;

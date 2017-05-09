@@ -13,9 +13,9 @@ cd ..
 
 @echo Available Tests:
 @echo 1) 0 0 No corrupion or packet loss
-@echo 2) 0 1 No corrupion and  packet loss
-@echo 3) 1 0 corrupion and no packet loss
-@echo 4) 1 1 Corrupion and packet loss
+@echo 2) 0 1 No corrupion and packet loss
+@echo 3) 1 0 Corruption and no packet loss
+@echo 4) 1 1 Corruption and packet loss
 @echo Which Test:
 set /p selection=
 @echo %selection%

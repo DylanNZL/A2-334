@@ -64,12 +64,12 @@ int packets_lostbit=0;
 //You are allowed to change this. You will need to alter the NUMBER_OF_WORDS_IN_THE_HEADER if you add a CRC
 #define NUMBER_OF_WORDS_IN_THE_HEADER 3
 
-void save_line_without_header(char * receive_buffer,FILE *fout){
+void save_line_without_header(char * receive_buffer, FILE *fout){
 	//char *sep = " "; //separator is the space character
 
 	char sep[3];
 
-    strcpy(sep," "); //separator is the space character
+  strcpy(sep," "); //separator is the space character
 	char *word;
 	int wcount=0;
 	char dataExtracted[BUFFER_SIZE]="\0";
@@ -106,10 +106,12 @@ void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char 
 
   while (1) {
 	 if(tokenCounter ==0){
-       pch = strtok (str, " ,.-'\r\n'");
-    } else {
-		 pch = strtok (NULL, " ,.-'\r\n'");
-	 }
+      pch = strtok (str, " ,.-'\r\n'");
+    } else if (tokenCounter == 3) {
+		 	pch = strtok (NULL, "'\r\n'");
+	 } else  {
+			pch = strtok (NULL, " ,.-'\r\n'");
+	}
 
 	 if(pch == NULL) break;
     switch(tokenCounter){
@@ -168,20 +170,17 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_storage clientAddress; //IPv4 & IPv6 -compliant
 	struct addrinfo *result = NULL;
     struct addrinfo hints;
-	int iResult;
-
+		int iResult;
     SOCKET s;
     char send_buffer[BUFFER_SIZE],receive_buffer[BUFFER_SIZE];
     int n,bytes,addrlen;
 
-	memset(&hints, 0, sizeof(struct addrinfo));
+		memset(&hints, 0, sizeof(struct addrinfo));
 
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
-	hints.ai_flags = AI_PASSIVE; // For wildcard IP address
-
-
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+		hints.ai_flags = AI_PASSIVE; // For wildcard IP address
     randominit();
 //********************************************************************
 // WSSTARTUP
@@ -222,9 +221,6 @@ int main(int argc, char *argv[]) {
 		 exit(1);//return 1;
 	}
 
-
-
-
    packets_damagedbit=atoi(argv[2]);
    packets_lostbit=atoi(argv[3]);
    if (packets_damagedbit < 0 || packets_damagedbit > 1 || packets_lostbit < 0 || packets_lostbit > 1){
@@ -233,9 +229,9 @@ int main(int argc, char *argv[]) {
    }
 
    int counter=0;
-//********************************************************************
-//BIND
-//********************************************************************
+	//********************************************************************
+	//BIND
+	//********************************************************************
    iResult = bind( s, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR) {
         printf("bind failed with error: %d\n", WSAGetLastError());
@@ -245,7 +241,6 @@ int main(int argc, char *argv[]) {
         WSACleanup();
         return 1;
     }
-
     cout << "==============<< UDP SERVER >>=============" << endl;
     cout << "channel can damage packets=" << packets_damagedbit << endl;
     cout << "channel can lose packets=" << packets_lostbit << endl;
@@ -314,10 +309,10 @@ int main(int argc, char *argv[]) {
 		printf("\n================================================\n");
 		printf("RECEIVED --> %s \n",receive_buffer);
 			if (strncmp(receive_buffer,"CLOSE",5)==0)  {//if client says "CLOSE", the last packet for the file was sent. Close the file
-				//Remember that the packet carrying "CLOSE" may be lost or damaged as well!
+				// Remember that the packet carrying "CLOSE" may be lost or damaged as well!
 				fclose(fout);
 				closesocket(s);
-				printf("Server saved data_received.txt \n");//you have to manually check to see if this file is identical to file1_Windows.txt
+				printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
 				printf("Closing the socket connection and Exiting...\n");
 				break;
 			}
@@ -329,22 +324,28 @@ int main(int argc, char *argv[]) {
 					 int packet_number = 0;
 					 char *data;
 					 extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
-					 printf ("%d", CRC_recv);
-					 printf(command);
-					 printf("%d", packet_number);
-					 printf(data);
-		 			//********************************************************************
-		 			//SEND ACK
-		 			//********************************************************************
-		 			sprintf(send_buffer,"ACK %d \r\n",packet_number);
-
-		 			//send ACK ureliably
-
-		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-
-		 			//store the packet's data into a file
-		 			//save_line_without_header(receive_buffer,fout);
-					//TODO: save data
+					 int CRC = CRCpolynomial(data);
+					 // DEBUG:
+					 printf ("CRC RECIEVED: %d\n", CRC_recv);
+					 printf("CRC FROM DATA: %d\n", CRC);
+					 printf("COMMAND: %s\n",command);
+					 printf("PACKET NUM: %d\n", packet_number);
+					 printf("DATA: \"%s\"\n", data);
+					 if (CRC == CRC_recv) {
+						 sprintf(send_buffer,"ACK %d \r\n",packet_number);
+	 		 			//send ACK ureliably
+	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+						//store the packet's data into a file
+						// TODO: BUFFER INTO VECTOR AND WRITE AT END?
+						// OR WRITE IF IN ORDER AND BUFFER IF NOT
+						fprintf(fout, "%s\n", data);
+						printf("Wrote to file: \"%s\"", data);
+					} else {
+						// DAMAGED PACKET
+						sprintf(send_buffer,"NAK %d \r\n",packet_number);
+					 //send ACK ureliably
+					 send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+				 }
 			}
    }
    closesocket(s);
