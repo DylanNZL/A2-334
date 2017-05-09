@@ -39,6 +39,7 @@
 	#include <string.h>
 	#include <stdlib.h>
 	#include <iostream>
+	#include <vector>
 #endif
 
 #include "myrandomizer.h"
@@ -64,54 +65,24 @@ int packets_lostbit=0;
 //You are allowed to change this. You will need to alter the NUMBER_OF_WORDS_IN_THE_HEADER if you add a CRC
 #define NUMBER_OF_WORDS_IN_THE_HEADER 3
 
-void save_line_without_header(char * receive_buffer, FILE *fout){
-	//char *sep = " "; //separator is the space character
-
-	char sep[3];
-
-  strcpy(sep," "); //separator is the space character
-	char *word;
-	int wcount=0;
-	char dataExtracted[BUFFER_SIZE]="\0";
-
-	// strtok remembers the position of the last token extracted.
-	// strtok is first called using a buffer as an argument.
-	// successive calls requires NULL as an argument.
-	// the function remembers internally where it stopped last time
-
-	//loop while word is not equal to NULL.
-	for (word = strtok(receive_buffer, sep); word; word = strtok(NULL, sep))
-	{
-		wcount++;
-		if(wcount > NUMBER_OF_WORDS_IN_THE_HEADER){ //if the word extracted is not part of the header anymore
-			strcat(dataExtracted, word); //extract the word and store it as part of the data
-			strcat(dataExtracted, " "); //append space
-		}
-	}
-
-	dataExtracted[strlen(dataExtracted)-1]=(char)'\0'; //get rid of last space appended
-	printf("DATA: %s, %d elements\n",dataExtracted,int(strlen(dataExtracted)));
-
-	//make sure that the file pointer has been properly initialised
-	if (fout!=NULL) fprintf(fout,"%s\n",dataExtracted); //write to file
-	else {
-		printf("Error in writing to write...\n");
-		exit(1);
-	}
-}
+struct tempData {
+	char * data;
+	int packetNumber;
+};
 
 void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char *&data){
 	char * pch;
   int tokenCounter=0;
 
   while (1) {
-	 if(tokenCounter ==0){
+	 if (tokenCounter ==0) {
       pch = strtok (str, " ,.-'\r\n'");
     } else if (tokenCounter == 3) {
+			// NOTE: THE DATA MIGHT CONTAIN SPACES SO REMOVED FROM THE STRTOK OPTIONS
 		 	pch = strtok (NULL, "'\r\n'");
 	 } else  {
 			pch = strtok (NULL, " ,.-'\r\n'");
-	}
+	 }
 
 	 if(pch == NULL) break;
     switch(tokenCounter){
@@ -227,8 +198,6 @@ int main(int argc, char *argv[]) {
 	   printf("USAGE: Rserver_UDP localport allow_corrupted_bits(0 or 1) allow_packet_loss(0 or 1)\n");
 	   exit(0);
    }
-
-   int counter=0;
 	//********************************************************************
 	//BIND
 	//********************************************************************
@@ -249,50 +218,27 @@ int main(int argc, char *argv[]) {
 	                       //function for the server's address, as it is
 	                       //no longer needed
 //********************************************************************
-// Open file to save the incoming packets
-//********************************************************************
-//In text mode, carriage return�linefeed combinations
-//are translated into single linefeeds on input, and
-//linefeed characters are translated to carriage return�linefeed combinations on output.
-	 FILE *fout=fopen("data_received.txt","w");
-
-//********************************************************************
-
 //INFINITE LOOP
 //********************************************************************
+	// Variables
+	 vector <tempData *> temp_buffer;
+	 vector <char *> write_buffer;
+	 int counter = 0;
+	 FILE *fout = fopen("data_received.txt","w");
    while (1) {
-//********************************************************************
-//RECEIVE
-//********************************************************************
-//printf("Waiting... \n");
 		addrlen = sizeof(clientAddress); //IPv4 & IPv6-compliant
 		memset(receive_buffer,0,sizeof(receive_buffer));
 		bytes = recvfrom(s, receive_buffer, SEGMENT_SIZE, 0, (struct sockaddr*)&clientAddress, &addrlen);
-
-//********************************************************************
-//IDENTIFY UDP client's IP address and port number.
-//********************************************************************
-	char clientHost[NI_MAXHOST];
+		//IDENTIFY UDP client's IP address and port number.
+		char clientHost[NI_MAXHOST];
     char clientService[NI_MAXSERV];
     memset(clientHost, 0, sizeof(clientHost));
     memset(clientService, 0, sizeof(clientService));
-
-
-    getnameinfo((struct sockaddr *)&clientAddress, addrlen,
-                  clientHost, sizeof(clientHost),
-                  clientService, sizeof(clientService),
-                  NI_NUMERICHOST);
-
-
-
+    getnameinfo((struct sockaddr *)&clientAddress, addrlen, clientHost, sizeof(clientHost), clientService, sizeof(clientService), NI_NUMERICHOST);
     printf("\nReceived a packet of size %d bytes from <<<UDP Client>>> with IP address:%s, at Port:%s\n",bytes,clientHost, clientService);
-
-//********************************************************************
-//PROCESS RECEIVED PACKET
-//********************************************************************
-
+		//PROCESS RECEIVED PACKET
 		//Remove trailing CR and LF
-		n=0;
+		n = 0;
 		while(n < bytes){
 			n++;
 			if ((bytes < 0) || (bytes == 0)) break;
@@ -303,14 +249,11 @@ int main(int argc, char *argv[]) {
 			if (receive_buffer[n] == '\r') /*ignore CRs*/
 				receive_buffer[n] = '\0';
 		}
-
 		if ((bytes < 0) || (bytes == 0)) break;
-
 		printf("\n================================================\n");
 		printf("RECEIVED --> %s \n",receive_buffer);
 			if (strncmp(receive_buffer,"CLOSE",5)==0)  {//if client says "CLOSE", the last packet for the file was sent. Close the file
 				// Remember that the packet carrying "CLOSE" may be lost or damaged as well!
-				fclose(fout);
 				closesocket(s);
 				printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
 				printf("Closing the socket connection and Exiting...\n");
@@ -332,14 +275,39 @@ int main(int argc, char *argv[]) {
 					 printf("PACKET NUM: %d\n", packet_number);
 					 printf("DATA: \"%s\"\n", data);
 					 if (CRC == CRC_recv) {
-						 sprintf(send_buffer,"ACK %d \r\n",packet_number);
-	 		 			//send ACK ureliably
-	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-						//store the packet's data into a file
-						// TODO: BUFFER INTO VECTOR AND WRITE AT END?
-						// OR WRITE IF IN ORDER AND BUFFER IF NOT
-						fprintf(fout, "%s\n", data);
-						printf("Wrote to file: \"%s\"", data);
+						 if (packet_number == counter) {
+							 write_buffer.push_back(data);
+							 counter++;
+							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
+	 	 		 			//send ACK ureliably
+	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+							// Check if any packets in temp_buffer can be added and counter moved up
+							if (temp_buffer.size() != 0) {
+								while (1) {
+									if (temp_buffer.at(0)->packetNumber == counter) {
+										write_buffer.push_back(temp_buffer.at(0)->data);
+										counter ++;
+										temp_buffer.erase(temp_buffer.begin());
+									}
+									else { break; }
+								}
+							}
+						 } else if (packet_number > counter && packet_number <= counter + 3) {
+							 // Add value to temp buffer
+							 tempData *temp = new tempData;
+							 temp->packetNumber = packet_number;
+							 temp->data = new char[strlen(data)];
+							 temp->data = data;
+							 temp_buffer.push_back(temp);
+							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
+	 	 		 			//send ACK ureliably
+	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+						 } else if (packet_number < counter && packet_number >= counter - 4) {
+							 // Send ACK to catch sender up to where we are and the discard contents of packet
+							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
+	 	 		 			//send ACK ureliably
+	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+						 }
 					} else {
 						// DAMAGED PACKET
 						sprintf(send_buffer,"NAK %d \r\n",packet_number);
@@ -349,7 +317,18 @@ int main(int argc, char *argv[]) {
 			}
    }
    closesocket(s);
-
+	 //store the packet's data into a file
+	 // TODO: write write_buffer into file
+	 if (write_buffer.size() != 0) {
+		 vector<char *>::iterator it;
+		 for (it = write_buffer.begin(); it != write_buffer.end(); ++it) {
+			 char * toWrite = new char[strlen(*it)];
+			 toWrite = (*it);
+			 fprintf(fout, "%s\n", toWrite);
+			 printf("Wrote to file: \"%s\"\n", toWrite);
+		}
+	 }
+	 fclose(fout);
    cout << "==============<< STATISTICS >>=============" << endl;
    cout << "numOfPacketsDamaged=" << numOfPacketsDamaged << endl;
    cout << "numOfPacketsLost=" << numOfPacketsLost << endl;

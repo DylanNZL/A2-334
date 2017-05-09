@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
 	 printf("socket failed\n");
 	 exit(1);
 	}
-  //nonblocking option
+  // nonblocking option
 	// Set the socket I/O mode: In this case FIONBIO
 	// enables or disables the blocking mode for the
 	// socket based on the numerical value of iMode.
