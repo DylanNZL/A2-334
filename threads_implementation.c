@@ -57,7 +57,7 @@ unsigned long CALLBACK confirm_acknowledgement(void *ackPos) {
 	} else { //Not the first packet, we cannot move the frame
 		wait(mutex_canAck);
 		temp->acknowledged = true;
-		signal(mutex_canAck;
+		signal(mutex_canAck);
 	}
 	
 	//Delete thread - I need to look up how to do this, we didnt learn it in the paper. Martin kind of said to just leave it but not sure how this
