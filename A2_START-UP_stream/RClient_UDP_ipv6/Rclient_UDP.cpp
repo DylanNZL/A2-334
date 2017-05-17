@@ -63,14 +63,14 @@ struct packet {
 		acknowledged = false;
 		sentOnce = false;
 		packet_data = mPacket;
-		end_time = 0; // TODO: SET TO CURRENT TIME SO THAT IT WILL NEED TO BE SENT?
+		resendTime = clock(); // TODO: SET TO CURRENT TIME SO THAT IT WILL NEED TO BE SENT?
 	}
 	packet() {
 	}
 	bool acknowledged;
 	bool sentOnce;
 	char* packet_data;
-	clock_t end_time;
+	clock_t resendTime;
 };
 
 WSADATA wsadata;
@@ -244,11 +244,23 @@ int main(int argc, char *argv[]) {
 					cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 					send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
 					packets.at(i).sentOnce = true;
-					packets.at(i).end_time = clock(); // TODO: IS THIS RIGHT?
+					packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+				} else {
+					// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
+					double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
+					if ( timeElapsed > 500 ) {
+						printf("%f\n\n", timeElapsed);
+						strcpy(send_buffer, packets.at(i).packet_data);
+						// DEBUG:
+						cout << "Resending: " << send_buffer;
+						cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+						send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+						packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+					}
 				}
 		}
 		// NOTE was originally 1, set to 1000 to make it send one packet every second
-		//Sleep(SLEEP_TIME);  // sleep for 1 millisecond
+		Sleep(SLEEP_TIME);  // sleep for 1 millisecond
 		// DO WE NEED TO SLEEP NOW?
 		addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
 		bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
@@ -301,7 +313,7 @@ int main(int argc, char *argv[]) {
 				cout << "Sending: " << send_buffer << endl;
 				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 				send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-				packets.at(i).end_time = clock(); // TODO: IS THIS RIGHT?
+				packets.at(packetRecieved).resendTime = clock(); // TODO: IS THIS RIGHT?
 			}
 		}
 	} //while loop
