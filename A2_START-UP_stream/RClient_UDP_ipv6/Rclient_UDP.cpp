@@ -294,7 +294,14 @@ int main(int argc, char *argv[]) {
 				strncpy(temp_buffer, &receive_buffer[4], 10);
 				int packetRecieved = atoi(temp_buffer);
 				printf("Recieved NAK for packet %s\n", temp_buffer);
-				//TODO: RESEND PACKET
+
+				// RESEND
+				strcpy(send_buffer, packets.at(packetRecieved).packet_data);
+				// DEBUG:
+				cout << "Sending: " << send_buffer << endl;
+				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+				send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+				packets.at(i).end_time = clock(); // TODO: IS THIS RIGHT?
 			}
 		}
 	} //while loop
