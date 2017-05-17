@@ -73,7 +73,6 @@ struct tempData {
 void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char *&data){
 	char * pch;
   int tokenCounter=0;
-
   while (1) {
 	 if (tokenCounter ==0) {
       pch = strtok (str, " ,.-'\r\n'");
@@ -83,8 +82,7 @@ void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char 
 	 } else  {
 			pch = strtok (NULL, " ,.-'\r\n'");
 	 }
-
-	 if(pch == NULL) break;
+	 if (pch == NULL) break;
     switch(tokenCounter){
       case 0:
 				CRC = atoi(pch);
@@ -259,9 +257,7 @@ int main(int argc, char *argv[]) {
 				printf("Closing the socket connection and Exiting...\n");
 				break;
 			}
-			else {//it is not a PACKET nor a CLOSE; therefore, it might be a damaged packet
-				   //Are you going to do nothing, ignoring the damaged packet?
-				   //Or, send a negative ACK? It is up to you to decide here.
+			else {
 					 int CRC_recv = 0;
 					 char *command;
 					 int packet_number = 0;
