@@ -225,6 +225,7 @@ int main(int argc, char *argv[]) {
 		memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
 
 		// SENT ALL PACKETS SO WE ARE DONE
+		// TODO: WHAT HAPPENS IF CLOSE IS LOST?
 		if (windowBase > numPackets) {
 			printf("End-of-File reached. \n");
 			memset(send_buffer, 0, sizeof(send_buffer));
@@ -259,9 +260,8 @@ int main(int argc, char *argv[]) {
 					}
 				}
 		}
-		// NOTE was originally 1, set to 1000 to make it send one packet every second
-		Sleep(SLEEP_TIME);  // sleep for 1 millisecond
-		// DO WE NEED TO SLEEP NOW?
+		// NOTE Don't think it is needed anymore
+		//Sleep(1);  // sleep for 1 millisecond
 		addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
 		bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
 		// IDENTIFY server's IP address and port number.
