@@ -39,6 +39,10 @@
 	#include <string.h>
 	#include <stdlib.h>
 	#include <iostream>
+	#include <vector>
+	#include <conio.h>
+	#include <windows.h>
+	#include <ctime>
 #endif
 
 #include "myrandomizer.h"
@@ -53,6 +57,21 @@ using namespace std;
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
 #define SLEEP_TIME 500 // Time in ms for the application to sleep for.
 #define WINDOW_SIZE 4 // Size of window
+
+struct packet {
+	packet(char* mPacket) {
+		acknowledged = false;
+		sentOnce = false;
+		packet_data = mPacket;
+		end_time = 0; // TODO: SET TO CURRENT TIME SO THAT IT WILL NEED TO BE SENT?
+	}
+	packet() {
+	}
+	bool acknowledged;
+	bool sentOnce;
+	char* packet_data;
+	clock_t end_time;
+};
 
 WSADATA wsadata;
 const int ARG_COUNT=5;
@@ -166,12 +185,9 @@ int main(int argc, char *argv[]) {
 	//SEND A TEXT FILE
 	//*******************************************************************
 	int counter = 0;
+	vector<packet> packets; // CONTAINER FOR PACKETS
 	char temp_buffer[BUFFER_SIZE];
-	char window[WINDOW_SIZE][BUFFER_SIZE + 30]; // Window
 	FILE *fin=fopen("data_for_transmission.txt","rb"); //original
-	//In text mode, carriage return�linefeed combinations
-	//are translated into single linefeeds on input, and
-	//linefeed characters are translated to carriage return�linefeed combinations on output.
 	if(fin==NULL) {
 		printf("cannot open data_for_transmission.txt\n");
 		closesocket(s);
@@ -180,85 +196,106 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("data_for_transmission.txt is now open for sending\n");
   }
+
+	// READ IN FILE AND STORE AS PACKETS IN THE VECTOR
+	while(1) {
+		if (feof(fin)) { fclose(fin); break; }
+
+		fgets(temp_buffer, SEGMENT_SIZE, fin); // get one line of data from the file
+		strtok(temp_buffer, "'\r\n'"); // Remove /r/n
+		unsigned int CRC = CRCpolynomial(temp_buffer); // CRC
+		char *temp_packet = (char *) malloc(BUFFER_SIZE + 30);
+		sprintf(temp_packet, "%d Packet %d %s\r\n", CRC, counter, temp_buffer); // Join into a packet string
+		// DEBUG:
+		/*printf("CRC: %d\n", CRC);
+		printf("PACKET: %d\n", counter);
+		printf("COMMAND: Packet\n");
+		printf("DATA: \"%s\"\n", temp_buffer);
+		printf("PACKET: %s\n", temp_packet);*/
+
+		packet p = packet(temp_packet); // create a full packet struct
+		packets.push_back(p);
+		counter++;
+	}
+
+	int numPackets = counter - 1; // Take away one because it always increments the counter for the next packet.
+	int windowBase = 0;
+
 	while (1) {
-		if (!feof(fin)) {
-	 	memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
-		// TODO: Convert to reading in 4 lines to send each time
-		int packets;
-		for (packets = 0; packets < 4; packets++) {
-			if (feof(fin)) { break; }
+		memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
 
-			fgets(temp_buffer,SEGMENT_SIZE,fin); // get one line of data from the file
-			strtok(temp_buffer, "'\r\n'");
-			unsigned int CRC = CRCpolynomial(temp_buffer);
-			// DEBUG:
-			printf("CRC: %d\n", CRC);
-			printf("PACKET: %d\n", counter);
-			printf("COMMAND: Packet\n");
-			printf("DATA: \"%s\"\n", temp_buffer);
-			sprintf(window[packets], "%d Packet %d %s\r\n", CRC, counter, temp_buffer);
-			printf("%s\n", window[packets]);
-			counter++;
-		}
-			// TODO: send window
-
-			for (int h = 0; h < packets; h++) {
-				strcpy(send_buffer, window[h]);
-				printf("\n======================================================\n");
-				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
-				send_unreliably(s,send_buffer,(result->ai_addr)); //send the packet to the unreliable data channel
-			}
-
-			int recv_counter = 0;
-			while (true) {
-				// NOTE was originally 1, set to 1000 to make it send one packet every second
-				Sleep(SLEEP_TIME);  // sleep for 1 millisecond
-				// If we have recieved ACK for all packets continue
-				if (recv_counter == packets) { break; }
-				//********************************************************************
-				//RECEIVE
-				//********************************************************************
-				addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
-				// TODO: Reveive ACK for window
-				bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
-				//********************************************************************
-				//IDENTIFY server's IP address and port number.
-				//********************************************************************
-				char serverHost[NI_MAXHOST];
-				char serverService[NI_MAXSERV];
-				memset(serverHost, 0, sizeof(serverHost));
-				memset(serverService, 0, sizeof(serverService));
-				getnameinfo((struct sockaddr *)&remoteaddr, addrlen, serverHost, sizeof(serverHost), serverService, sizeof(serverService), NI_NUMERICHOST);
-				printf("\nReceived a packet of size %d bytes from <<<UDP Server>>> with IP address:%s, at Port:%s\n",bytes,serverHost, serverService);
-				//********************************************************************
-				//PROCESS REQUEST
-				//********************************************************************
-				//Remove trailing CR and LN
-				if( bytes != SOCKET_ERROR ) {
-					n=0;
-					while (n<bytes){
-						n++;
-						if ((bytes < 0) || (bytes == 0)) break;
-						if (receive_buffer[n] == '\n') { /*end on a LF*/
-							receive_buffer[n] = '\0';
-							break;
-						}
-						if (receive_buffer[n] == '\r') /*ignore CRs*/
-						receive_buffer[n] = '\0';
-					}
-					printf("RECEIVED --> %s, %d elements\n",receive_buffer, int(strlen(receive_buffer)));
-				}
-				recv_counter++;
-			}
-
-		} else {
-			fclose(fin);
+		// SENT ALL PACKETS SO WE ARE DONE
+		if (windowBase > numPackets) {
 			printf("End-of-File reached. \n");
 			memset(send_buffer, 0, sizeof(send_buffer));
 			sprintf(send_buffer,"CLOSE \r\n"); //send a CLOSE command to the RECEIVER (Server)
 			printf("\n======================================================\n");
 			send_unreliably(s,send_buffer,(result->ai_addr));
 			break;
+		}
+
+		for (int i = windowBase; i < windowBase + WINDOW_SIZE; i++) {
+			if (i > numPackets) { break; }
+			// If it hasn't been sent the first time and hasn't been acknowledged
+			if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
+					strcpy(send_buffer, packets.at(i).packet_data);
+					// DEBUG:
+					cout << "Sending: " << send_buffer << endl;
+					cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+					send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+					packets.at(i).sentOnce = true;
+					packets.at(i).end_time = clock(); // TODO: IS THIS RIGHT?
+				}
+		}
+		// NOTE was originally 1, set to 1000 to make it send one packet every second
+		//Sleep(SLEEP_TIME);  // sleep for 1 millisecond
+		// DO WE NEED TO SLEEP NOW?
+		addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
+		bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
+		// IDENTIFY server's IP address and port number.
+		char serverHost[NI_MAXHOST]; char serverService[NI_MAXSERV];
+		memset(serverHost, 0, sizeof(serverHost)); memset(serverService, 0, sizeof(serverService));
+		getnameinfo((struct sockaddr *)&remoteaddr, addrlen, serverHost, sizeof(serverHost), serverService, sizeof(serverService), NI_NUMERICHOST);
+		//Remove trailing CR and LN
+		if (bytes != SOCKET_ERROR || bytes != -1) {
+			printf("\nReceived a packet of size %d bytes from <<<UDP Server>>> with IP address:%s, at Port:%s\n",bytes,serverHost, serverService);
+			n = 0;
+			while (n<bytes){
+				n++;
+				if ((bytes < 0) || (bytes == 0)) break;
+				if (receive_buffer[n] == '\n') { /*end on a LF*/
+					receive_buffer[n] = '\0';
+					break;
+				}
+				if (receive_buffer[n] == '\r') /*ignore CRs*/
+				receive_buffer[n] = '\0';
+			}
+			printf("RECEIVED --> %s, %d elements\n",receive_buffer, int(strlen(receive_buffer)));
+			// RECIEVED ACK
+			if (strncmp(receive_buffer, "ACK", 3) == 0) {
+				strncpy(temp_buffer, &receive_buffer[4], 10);
+				int packetRecieved = atoi(temp_buffer);
+				printf("Recieved acknowledgement for packet %d\n", packetRecieved);
+				packets.at(packetRecieved).acknowledged = true;
+				// MOVE WINDOW
+				if (windowBase == packetRecieved) {
+					if (packetRecieved != numPackets) {
+						if (packets.at(windowBase + 1).acknowledged != true) { windowBase++; }
+						else if (packets.at(windowBase + 2).acknowledged != true) { windowBase += 2; }
+						else if (packets.at(windowBase + 3).acknowledged != true) { windowBase += 3; }
+						else { windowBase += 4; }
+					} else if (windowBase != packetRecieved) {
+						packets.at(packetRecieved).acknowledged = true;
+					} else {
+						windowBase++;
+					}
+				}
+			} else if (strncmp(receive_buffer, "NAK", 3) == 0) {
+				strncpy(temp_buffer, &receive_buffer[4], 10);
+				int packetRecieved = atoi(temp_buffer);
+				printf("Recieved NAK for packet %s\n", temp_buffer);
+				//TODO: RESEND PACKET
+			}
 		}
 	} //while loop
 	//*******************************************************************
