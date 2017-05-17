@@ -55,7 +55,7 @@ using namespace std;
                         //the BUFFER_SIZE has to be at least big enough to receive the packet
 #define SEGMENT_SIZE 78
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
-#define SLEEP_TIME 500 // Time in ms for the application to sleep for.
+#define SLEEP_TIME 200 // Time in ms for the application to sleep for.
 #define WINDOW_SIZE 4 // Size of window
 
 struct packet {

@@ -269,11 +269,11 @@ int main(int argc, char *argv[]) {
 					 extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
 					 int CRC = CRCpolynomial(data);
 					 // DEBUG:
-					 printf ("CRC RECIEVED: %d\n", CRC_recv);
+					/* printf ("CRC RECIEVED: %d\n", CRC_recv);
 					 printf("CRC FROM DATA: %d\n", CRC);
 					 printf("COMMAND: %s\n",command);
 					 printf("PACKET NUM: %d\n", packet_number);
-					 printf("DATA: \"%s\"\n", data);
+					 printf("DATA: \"%s\"\n", data);*/
 					 if (CRC == CRC_recv) {
 						 if (packet_number == counter) {
 							 write_buffer.push_back(data);
@@ -282,16 +282,14 @@ int main(int argc, char *argv[]) {
 	 	 		 			//send ACK ureliably
 	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 							// Check if any packets in temp_buffer can be added and counter moved up
-							if (temp_buffer.size() != 0) {
 								while (1) {
-									if (temp_buffer.at(0)->packetNumber == counter) {
+									if (temp_buffer.size() != 0 && temp_buffer.at(0)->packetNumber == counter) {
 										write_buffer.push_back(temp_buffer.at(0)->data);
 										counter ++;
 										temp_buffer.erase(temp_buffer.begin());
 									}
 									else { break; }
 								}
-							}
 						 } else if (packet_number > counter && packet_number <= counter + 3) {
 							 // Add value to temp buffer
 							 tempData *temp = new tempData;
