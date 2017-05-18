@@ -226,51 +226,61 @@ int main(int argc, char *argv[]) {
 	while (1) {
 		memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
 
-		// SENT ALL PACKETS SO WE ARE DONE
-		// TODO: WHAT HAPPENS IF CLOSE IS LOST?
+		/**
+		 * SEND
+		 */
+
+		// All packets are sent so send close and wait for ack to close socket
 		if (windowBase > numPackets) {
 			if (!closePacket.sentOnce) {
-				memset(send_buffer, 0, sizeof(send_buffer));
+				// DEBUG:
+				cout <<"SENDING CLOSE\n";
 				sprintf(send_buffer, closePacket.packet_data); //send a CLOSE command to the RECEIVER (Server)
 				send_unreliably(s,send_buffer,(result->ai_addr));
 				closeCount++;
 			} else if ((clock() - closePacket.resendTime) * 1000 / CLOCKS_PER_SEC > 500) {
-				memset(send_buffer, 0, sizeof(send_buffer));
+				cout << "RESENDING CLOSE\n";
 				sprintf(send_buffer, closePacket.packet_data); //send a CLOSE command to the RECEIVER (Server)
 				send_unreliably(s,send_buffer,(result->ai_addr));
 				closeCount++;
 			}
 			// If we've sent it more than 5 times give up
+			// NOTE could be more or less as we may miss the first ack and just delay closing
 			if (closeCount == 5) {
 				break;
 			}
 		}
-
-		for (int i = windowBase; i < windowBase + WINDOW_SIZE; i++) {
-			if (i > numPackets) { break; }
-			// If it hasn't been sent the first time and hasn't been acknowledged
-			if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
-					strcpy(send_buffer, packets.at(i).packet_data);
-					// DEBUG:
-					cout << "Sending: " << send_buffer << endl;
-					cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
-					send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-					packets.at(i).sentOnce = true;
-					packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
-				} else {
-					// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
-					double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
-					if ( timeElapsed > 500 ) {
-						printf("%f\n\n", timeElapsed);
+		// SEND/RESEND Data Packets
+		else {
+			for (int i = windowBase; i < windowBase + WINDOW_SIZE; i++) {
+				if (i > numPackets) { break; }
+				// If it hasn't been sent the first time and hasn't been acknowledged
+				if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
-						cout << "Resending: " << send_buffer;
+						cout << "Sending: " << send_buffer << endl;
 						cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 						send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+						packets.at(i).sentOnce = true;
 						packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+					} else {
+						// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
+						double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
+						if ( timeElapsed > 500 ) {
+							printf("%f\n\n", timeElapsed);
+							strcpy(send_buffer, packets.at(i).packet_data);
+							// DEBUG:
+							cout << "Resending: " << send_buffer;
+							cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+							send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+							packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+						}
 					}
 				}
 		}
+		/**
+		 * RECIEVE
+		 */
 		// NOTE Don't think it is needed anymore
 		//Sleep(1);  // sleep for 1 millisecond
 		addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
@@ -303,21 +313,24 @@ int main(int argc, char *argv[]) {
 				// MOVE WINDOW
 				if (windowBase == packetRecieved) {
 					if (packetRecieved != numPackets) {
-						if (packets.at(windowBase + 1).acknowledged != true) { windowBase++; }
-						else if (packets.at(windowBase + 2).acknowledged != true) { windowBase += 2; }
-						else if (packets.at(windowBase + 3).acknowledged != true) { windowBase += 3; }
-						else { windowBase += 4; }
-					} else if (windowBase != packetRecieved) {
-						packets.at(packetRecieved).acknowledged = true;
-					} else {
+						int p = 1;
+						while (1) {
+							if (windowBase + p >= numPackets && packets.at(numPackets).acknowledged != true) { windowBase = numPackets; break; }
+							else if (packets.at(windowBase + p).acknowledged != true) { windowBase += p; break; }
+							else if (p >= 3) { windowBase += 4; break; }
+							p++;
+						}
+					}
+					else {
 						windowBase++;
 					}
+				} else if (windowBase != packetRecieved) {
+						packets.at(packetRecieved).acknowledged = true;
 				}
 			} else if (strncmp(receive_buffer, "NAK", 3) == 0) {
 				strncpy(temp_buffer, &receive_buffer[4], 10);
 				int packetRecieved = atoi(temp_buffer);
 				printf("Recieved NAK for packet %s\n", temp_buffer);
-
 				// RESEND
 				strcpy(send_buffer, packets.at(packetRecieved).packet_data);
 				// DEBUG:

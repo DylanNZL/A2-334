@@ -72,9 +72,9 @@ struct tempData {
 
 void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char *&data){
 	char * pch;
-  int tokenCounter=0;
+  int tokenCounter = 0;
   while (1) {
-	 if (tokenCounter ==0) {
+	 if (tokenCounter == 0) {
       pch = strtok (str, " ,.-'\r\n'");
     } else if (tokenCounter == 3) {
 			// NOTE: THE DATA MIGHT CONTAIN SPACES SO REMOVED FROM THE STRTOK OPTIONS
@@ -95,12 +95,14 @@ void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char 
 				packetNumber = atoi(pch);
 		    break;
 		case 3:
-			data = new char[strlen(pch)];
+			int len = strlen(pch);
+			data = new char[len+1];
 			strcpy(data, pch);
 			break;
     }
 	 tokenCounter++;
   }
+	cout << "EXTRACTED\n";
 }
 
 unsigned int CRCpolynomial(char *buffer){
@@ -201,12 +203,12 @@ int main(int argc, char *argv[]) {
 	//********************************************************************
    iResult = bind( s, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR) {
-        printf("bind failed with error: %d\n", WSAGetLastError());
-        freeaddrinfo(result);
+      printf("bind failed with error: %d\n", WSAGetLastError());
+      freeaddrinfo(result);
 
-        closesocket(s);
-        WSACleanup();
-        return 1;
+      closesocket(s);
+      WSACleanup();
+      return 1;
     }
     cout << "==============<< UDP SERVER >>=============" << endl;
     cout << "channel can damage packets=" << packets_damagedbit << endl;
@@ -260,57 +262,75 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 			else {
-					 int CRC_recv = 0;
-					 char *command;
-					 int packet_number = 0;
-					 char *data;
-					 extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
-					 int CRC = CRCpolynomial(data);
-					 // DEBUG:
-					/* printf ("CRC RECIEVED: %d\n", CRC_recv);
-					 printf("CRC FROM DATA: %d\n", CRC);
-					 printf("COMMAND: %s\n",command);
-					 printf("PACKET NUM: %d\n", packet_number);
-					 printf("DATA: \"%s\"\n", data);*/
-					 if (CRC == CRC_recv) {
-						 if (packet_number == counter) {
-							 write_buffer.push_back(data);
-							 counter++;
-							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
-	 	 		 			//send ACK ureliably
-	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-							// Check if any packets in temp_buffer can be added and counter moved up
-								while (1) {
-									if (temp_buffer.size() != 0 && temp_buffer.at(0)->packetNumber == counter) {
-										write_buffer.push_back(temp_buffer.at(0)->data);
-										counter ++;
-										temp_buffer.erase(temp_buffer.begin());
-									}
-									else { break; }
-								}
-						 } else if (packet_number > counter && packet_number <= counter + 3) {
-							 // Add value to temp buffer
-							 tempData *temp = new tempData;
-							 temp->packetNumber = packet_number;
-							 temp->data = new char[strlen(data)];
-							 temp->data = data;
-							 temp_buffer.push_back(temp);
-							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
-	 	 		 			//send ACK ureliably
-	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-						 } else if (packet_number < counter && packet_number >= counter - 4) {
-							 // Send ACK to catch sender up to where we are and the discard contents of packet
-							 sprintf(send_buffer,"ACK %d \r\n",packet_number);
-	 	 		 			//send ACK ureliably
-	 	 		 			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-						 }
-					} else {
-						// DAMAGED PACKET
-						sprintf(send_buffer,"NAK %d \r\n",packet_number);
-					 //send ACK ureliably
-					 send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-				 }
-			}
+				cout << receive_buffer << "here1" << endl;
+				int CRC_recv = 0;
+				char *command;
+				int packet_number = 0;
+				char *data;
+				extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
+					cout << receive_buffer << "here6" << endl;
+				int CRC = CRCpolynomial(data);
+				// DEBUG:
+			 /* printf ("CRC RECIEVED: %d\n", CRC_recv);
+				printf("CRC FROM DATA: %d\n", CRC);
+				printf("COMMAND: %s\n",command);
+				printf("PACKET NUM: %d\n", packet_number);
+				printf("DATA: \"%s\"\n", data);*/
+				if (CRC == CRC_recv) {
+					cout << receive_buffer << "here2" << endl;
+					if (packet_number == counter) {
+						write_buffer.push_back(data);
+						counter++;
+						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+					  //send ACK ureliably
+					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+					  // Check if any packets in temp_buffer can be added and counter moved up
+						while (1) {
+							if (temp_buffer.size() != 0 && temp_buffer.front()->packetNumber == counter) {
+							  write_buffer.push_back(temp_buffer.front()->data);
+							  counter ++;
+							  temp_buffer.erase(temp_buffer.begin());
+						  }
+						  else { break; }
+						}
+					} else if (packet_number > counter && packet_number <= counter + 3) {
+						cout << receive_buffer << "here3" << endl;
+						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+					  //send ACK ureliably
+					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+						int j = 0; bool add = true;
+						while (temp_buffer.size() > j) {
+							if (temp_buffer.at(j)->packetNumber == packet_number) {
+								add = false;
+								break;
+							}
+							j++;
+						}
+						if (add) {
+							// Add value to temp buffer
+							tempData *temp = new tempData;
+							temp->packetNumber = packet_number;
+							temp->data = new char[strlen(data)];
+							temp->data = data;
+							temp_buffer.push_back(temp);
+						}
+					} else if (packet_number < counter && packet_number >= counter - 4) {
+
+							cout << receive_buffer << "here4" << endl;
+						// Send ACK to catch sender up to where we are and the discard contents of packet
+						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+					  //send ACK ureliably
+					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+					}
+			 } else {
+
+	 				cout << receive_buffer << "here5" << endl;
+				// DAMAGED PACKET
+				sprintf(send_buffer,"NAK %d \r\n",packet_number);
+				//send ACK ureliably
+				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+			 }
+	 	 }
    }
    closesocket(s);
 	 //store the packet's data into a file
@@ -321,8 +341,9 @@ int main(int argc, char *argv[]) {
 			 char * toWrite = new char[strlen(*it)];
 			 toWrite = (*it);
 			 fprintf(fout, "%s\n", toWrite);
+			 // DEBUG:
 			 printf("Wrote to file: \"%s\"\n", toWrite);
-		}
+		 }
 	 }
 	 fclose(fout);
    cout << "==============<< STATISTICS >>=============" << endl;
