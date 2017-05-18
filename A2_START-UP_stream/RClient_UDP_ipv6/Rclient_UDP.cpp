@@ -257,6 +257,7 @@ int main(int argc, char *argv[]) {
 				if (i > numPackets) { break; }
 				// If it hasn't been sent the first time and hasn't been acknowledged
 				if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
+						cout << "1) i is currently = " << i << endl;
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
 						cout << "Sending: " << send_buffer << endl;
@@ -316,8 +317,9 @@ int main(int argc, char *argv[]) {
 					if (packetRecieved != numPackets) {
 						int p = 1;
 						while (1) {
+							cout << "2) p is currently = " << p << " with windowBase = " << windowBase << endl;
 							if (windowBase + p >= numPackets && packets.at(numPackets).acknowledged != true) { windowBase = numPackets; break; }
-							else if (packets.at(windowBase + p).acknowledged != true) { windowBase += p; break; }
+							else if (windowBase + p <= numPackets && packets.at(windowBase + p).acknowledged != true) { windowBase += p; break; }
 							else if (p >= 3) { windowBase += 4; break; }
 							p++;
 						}
@@ -326,19 +328,26 @@ int main(int argc, char *argv[]) {
 						windowBase++;
 					}
 				} else if (windowBase != packetRecieved) {
+					cout << "packetRecieved= " << packetRecieved << endl;
 						packets.at(packetRecieved).acknowledged = true;
 				}
 			} else if (strncmp(receive_buffer, "NAK", 3) == 0) {
 				strncpy(temp_buffer, &receive_buffer[4], 10);
-				int packetRecieved = atoi(temp_buffer);
-				printf("Recieved NAK for packet %s\n", temp_buffer);
-				// RESEND
-				strcpy(send_buffer, packets.at(packetRecieved).packet_data);
-				// DEBUG:
-				cout << "Sending: " << send_buffer << endl;
-				//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
-				send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-				packets.at(packetRecieved).resendTime = clock(); // TODO: IS THIS RIGHT?
+				try {
+					int packetRecieved = atoi(temp_buffer);
+					printf("Recieved NAK for packet %s\n", temp_buffer);
+					// RESEND
+					if (packetRecieved <= numPackets && packetRecieved >= 0) {
+						strcpy(send_buffer, packets.at(packetRecieved).packet_data);
+						// DEBUG:
+						cout << "Sending: " << send_buffer << endl;
+						//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+						send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+						packets.at(packetRecieved).resendTime = clock();
+					}
+				} catch (...) {
+					cout << "ERROR Packet " << temp_buffer << " is out of range." << endl;
+				}
 			} else if (strncmp(receive_buffer, "CLOSE ACK", 9) == 0) {
 				cout << "RECIEVED CLOSE" << endl;
 				closePacket.acknowledged = true;

@@ -101,8 +101,7 @@ void extractTokens(char *str, int &CRC, char *&command, int &packetNumber, char 
 			break;
     }
 	 tokenCounter++;
-  }
-	cout << "EXTRACTED\n";
+ }
 }
 
 unsigned int CRCpolynomial(char *buffer){
@@ -262,13 +261,11 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 			else {
-				cout << receive_buffer << "here1" << endl;
 				int CRC_recv = 0;
 				char *command;
 				int packet_number = 0;
 				char *data;
 				extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
-					cout << receive_buffer << "here6" << endl;
 				int CRC = CRCpolynomial(data);
 				// DEBUG:
 			 /* printf ("CRC RECIEVED: %d\n", CRC_recv);
@@ -277,7 +274,6 @@ int main(int argc, char *argv[]) {
 				printf("PACKET NUM: %d\n", packet_number);
 				printf("DATA: \"%s\"\n", data);*/
 				if (CRC == CRC_recv) {
-					cout << receive_buffer << "here2" << endl;
 					if (packet_number == counter) {
 						write_buffer.push_back(data);
 						counter++;
@@ -294,11 +290,10 @@ int main(int argc, char *argv[]) {
 						  else { break; }
 						}
 					} else if (packet_number > counter && packet_number <= counter + 3) {
-						cout << receive_buffer << "here3" << endl;
 						sprintf(send_buffer,"ACK %d \r\n",packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-						int j = 0; bool add = true;
+						unsigned int j = 0; bool add = true;
 						while (temp_buffer.size() > j) {
 							if (temp_buffer.at(j)->packetNumber == packet_number) {
 								add = false;
@@ -315,16 +310,12 @@ int main(int argc, char *argv[]) {
 							temp_buffer.push_back(temp);
 						}
 					} else if (packet_number < counter && packet_number >= counter - 4) {
-
-							cout << receive_buffer << "here4" << endl;
 						// Send ACK to catch sender up to where we are and the discard contents of packet
 						sprintf(send_buffer,"ACK %d \r\n",packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 					}
 			 } else {
-
-	 				cout << receive_buffer << "here5" << endl;
 				// DAMAGED PACKET
 				sprintf(send_buffer,"NAK %d \r\n",packet_number);
 				//send ACK ureliably
