@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
 				if (i > numPackets) { break; }
 				// If it hasn't been sent the first time and hasn't been acknowledged
 				if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
-						cout << "1) i is currently = " << i << endl;
+						//cout << "1) i is currently = " << i << endl;
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
 						cout << "Sending: " << send_buffer << endl;
@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) {
 					if (packetRecieved != numPackets) {
 						int p = 1;
 						while (1) {
-							cout << "2) p is currently = " << p << " with windowBase = " << windowBase << endl;
+							//cout << "2) p is currently = " << p << " with windowBase = " << windowBase << endl;
 							if (windowBase + p >= numPackets && packets.at(numPackets).acknowledged != true) { windowBase = numPackets; break; }
 							else if (windowBase + p <= numPackets && packets.at(windowBase + p).acknowledged != true) { windowBase += p; break; }
 							else if (p >= 3) { windowBase += 4; break; }
@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
 						windowBase++;
 					}
 				} else if (windowBase != packetRecieved) {
-					cout << "packetRecieved= " << packetRecieved << endl;
+					  //cout << "packetRecieved= " << packetRecieved << endl;
 						packets.at(packetRecieved).acknowledged = true;
 				}
 			} else if (strncmp(receive_buffer, "NAK", 3) == 0) {

@@ -256,7 +256,6 @@ int main(int argc, char *argv[]) {
 				sprintf(send_buffer,"CLOSE ACK\r\n");
 				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 				closesocket(s);
-				printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
 				printf("Closing the socket connection and Exiting...\n");
 				break;
 			}
@@ -325,7 +324,6 @@ int main(int argc, char *argv[]) {
    }
    closesocket(s);
 	 //store the packet's data into a file
-	 // TODO: write write_buffer into file
 	 if (write_buffer.size() != 0) {
 		 vector<char *>::iterator it;
 		 for (it = write_buffer.begin(); it != write_buffer.end(); ++it) {
@@ -335,6 +333,7 @@ int main(int argc, char *argv[]) {
 			 // DEBUG:
 			 printf("Wrote to file: \"%s\"\n", toWrite);
 		 }
+		 printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
 	 }
 	 fclose(fout);
    cout << "==============<< STATISTICS >>=============" << endl;
