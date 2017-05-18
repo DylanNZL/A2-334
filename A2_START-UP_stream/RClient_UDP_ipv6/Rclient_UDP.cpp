@@ -186,9 +186,11 @@ int main(int argc, char *argv[]) {
 	//*******************************************************************
 	int counter = 0;
 	vector<packet> packets; // CONTAINER FOR PACKETS
+	packet closePacket = packet("CLOSE \r\n");
+	int closeCount = 0;
 	char temp_buffer[BUFFER_SIZE];
 	FILE *fin=fopen("data_for_transmission.txt","rb"); //original
-	if(fin==NULL) {
+	if(fin == NULL) {
 		printf("cannot open data_for_transmission.txt\n");
 		closesocket(s);
 		WSACleanup();
@@ -227,12 +229,21 @@ int main(int argc, char *argv[]) {
 		// SENT ALL PACKETS SO WE ARE DONE
 		// TODO: WHAT HAPPENS IF CLOSE IS LOST?
 		if (windowBase > numPackets) {
-			printf("End-of-File reached. \n");
-			memset(send_buffer, 0, sizeof(send_buffer));
-			sprintf(send_buffer,"CLOSE \r\n"); //send a CLOSE command to the RECEIVER (Server)
-			printf("\n======================================================\n");
-			send_unreliably(s,send_buffer,(result->ai_addr));
-			break;
+			if (!closePacket.sentOnce) {
+				memset(send_buffer, 0, sizeof(send_buffer));
+				sprintf(send_buffer, closePacket.packet_data); //send a CLOSE command to the RECEIVER (Server)
+				send_unreliably(s,send_buffer,(result->ai_addr));
+				closeCount++;
+			} else if ((clock() - closePacket.resendTime) * 1000 / CLOCKS_PER_SEC > 500) {
+				memset(send_buffer, 0, sizeof(send_buffer));
+				sprintf(send_buffer, closePacket.packet_data); //send a CLOSE command to the RECEIVER (Server)
+				send_unreliably(s,send_buffer,(result->ai_addr));
+				closeCount++;
+			}
+			// If we've sent it more than 5 times give up
+			if (closeCount == 5) {
+				break;
+			}
 		}
 
 		for (int i = windowBase; i < windowBase + WINDOW_SIZE; i++) {
@@ -314,6 +325,11 @@ int main(int argc, char *argv[]) {
 				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 				send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
 				packets.at(packetRecieved).resendTime = clock(); // TODO: IS THIS RIGHT?
+			} else if (strncmp(receive_buffer, "ACK CLOSE", 9) == 0) {
+				closePacket.acknowledged = true;
+				printf("End-of-File reached. \n");
+				printf("\n======================================================\n");
+				break;
 			}
 		}
 	} //while loop

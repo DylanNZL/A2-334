@@ -252,6 +252,8 @@ int main(int argc, char *argv[]) {
 		printf("RECEIVED --> %s \n",receive_buffer);
 			if (strncmp(receive_buffer,"CLOSE",5)==0)  {//if client says "CLOSE", the last packet for the file was sent. Close the file
 				// Remember that the packet carrying "CLOSE" may be lost or damaged as well!
+				sprintf(send_buffer,"CLOSE ACK\r\n");
+				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 				closesocket(s);
 				printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
 				printf("Closing the socket connection and Exiting...\n");
