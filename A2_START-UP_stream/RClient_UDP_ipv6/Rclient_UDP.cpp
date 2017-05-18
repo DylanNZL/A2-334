@@ -235,6 +235,7 @@ int main(int argc, char *argv[]) {
 			if (!closePacket.sentOnce) {
 				// DEBUG:
 				cout <<"SENDING CLOSE\n";
+				closePacket.sentOnce = true;
 				sprintf(send_buffer, closePacket.packet_data); //send a CLOSE command to the RECEIVER (Server)
 				send_unreliably(s,send_buffer,(result->ai_addr));
 				closeCount++;
@@ -259,7 +260,7 @@ int main(int argc, char *argv[]) {
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
 						cout << "Sending: " << send_buffer << endl;
-						cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+						//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 						send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
 						packets.at(i).sentOnce = true;
 						packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
@@ -271,7 +272,7 @@ int main(int argc, char *argv[]) {
 							strcpy(send_buffer, packets.at(i).packet_data);
 							// DEBUG:
 							cout << "Resending: " << send_buffer;
-							cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+							//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 							send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
 							packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
 						}
@@ -335,10 +336,11 @@ int main(int argc, char *argv[]) {
 				strcpy(send_buffer, packets.at(packetRecieved).packet_data);
 				// DEBUG:
 				cout << "Sending: " << send_buffer << endl;
-				cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+				//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 				send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
 				packets.at(packetRecieved).resendTime = clock(); // TODO: IS THIS RIGHT?
-			} else if (strncmp(receive_buffer, "ACK CLOSE", 9) == 0) {
+			} else if (strncmp(receive_buffer, "CLOSE ACK", 9) == 0) {
+				cout << "RECIEVED CLOSE" << endl;
 				closePacket.acknowledged = true;
 				printf("End-of-File reached. \n");
 				printf("\n======================================================\n");
