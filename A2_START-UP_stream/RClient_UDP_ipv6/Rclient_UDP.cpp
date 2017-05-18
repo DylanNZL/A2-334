@@ -336,8 +336,8 @@ int main(int argc, char *argv[]) {
 				try {
 					int packetRecieved = atoi(temp_buffer);
 					printf("Recieved NAK for packet %s\n", temp_buffer);
-					// RESEND
-					if (packetRecieved <= numPackets && packetRecieved >= 0) {
+					// RESEND if it is inside the current window and not higher than the total packets to send
+					if (packetRecieved <= numPackets && packetRecieved >= windowBase) {
 						strcpy(send_buffer, packets.at(packetRecieved).packet_data);
 						// DEBUG:
 						cout << "Sending: " << send_buffer << endl;

@@ -293,6 +293,7 @@ int main(int argc, char *argv[]) {
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 						unsigned int j = 0; bool add = true;
+						// Check that the packet isn't already waiting to be put into write buffer (we've recieced it already)
 						while (temp_buffer.size() > j) {
 							if (temp_buffer.at(j)->packetNumber == packet_number) {
 								add = false;
