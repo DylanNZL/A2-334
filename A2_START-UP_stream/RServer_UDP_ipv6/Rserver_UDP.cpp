@@ -272,12 +272,15 @@ int main(int argc, char *argv[]) {
 				printf("COMMAND: %s\n",command);
 				printf("PACKET NUM: %d\n", packet_number);
 				printf("DATA: \"%s\"\n", data);*/
+				char * crc = new char[10];
 				if (CRC == CRC_recv) {
 					cout << "Recieve window base = " << windowBase << endl;
 					if (packet_number == windowBase) {
 						write_buffer.push_back(data);
 						windowBase++;
-						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+						sprintf(crc, "ACK %d", packet_number);
+						int crc_send = CRCpolynomial(crc);
+						sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 					  // Check if any packets in temp_buffer can be added and windowBase moved up
@@ -291,7 +294,9 @@ int main(int argc, char *argv[]) {
 						}
 						cout << "Recieve window base after incrementing = " << windowBase << endl;
 					} else if (packet_number > windowBase && packet_number <= windowBase + 3) {
-						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+						sprintf(crc, "ACK %d", packet_number);
+						int crc_send = CRCpolynomial(crc);
+						sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 						unsigned int j = 0; bool add = true;
@@ -313,13 +318,17 @@ int main(int argc, char *argv[]) {
 						}
 					} else if (packet_number < windowBase && packet_number >= windowBase - 4) {
 						// Send ACK to catch sender up to where we are and the discard contents of packet
-						sprintf(send_buffer,"ACK %d \r\n",packet_number);
+						sprintf(crc, "ACK %d", packet_number);
+						int crc_send = CRCpolynomial(crc);
+						sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 					}
 			 } else {
 				// DAMAGED PACKET
-				sprintf(send_buffer,"NAK %d \r\n",packet_number);
+				sprintf(crc, "NAK %d", packet_number);
+				int crc_send = CRCpolynomial(crc);
+				sprintf(send_buffer,"%d NAK %d\r\n", crc_send, packet_number);
 				//send ACK ureliably
 				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
 			 }
