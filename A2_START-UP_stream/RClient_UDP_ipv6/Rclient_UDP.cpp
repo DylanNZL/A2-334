@@ -55,8 +55,6 @@ using namespace std;
                         //the BUFFER_SIZE has to be at least big enough to receive the packet
 #define SEGMENT_SIZE 78
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
-#define SLEEP_TIME 200 // Time in ms for the application to sleep for.
-#define WINDOW_SIZE 4 // Size of window
 
 struct packet {
 	packet(char* mPacket) {
@@ -229,7 +227,6 @@ int main(int argc, char *argv[]) {
 		/**
 		 * SEND
 		 */
-
 		// All packets are sent so send close and wait for ack to close socket
 		if (windowBase > numPackets) {
 			if (!closePacket.sentOnce) {
@@ -277,7 +274,7 @@ int main(int argc, char *argv[]) {
 							cout << "Resending: " << send_buffer;
 							//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 							send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-							packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+							packets.at(i).resendTime = clock();
 						}
 					}
 				}
@@ -313,7 +310,9 @@ int main(int argc, char *argv[]) {
 				strncpy(temp_buffer, &receive_buffer[4], 10);
 				int packetRecieved = atoi(temp_buffer);
 				printf("Recieved acknowledgement for packet %d\n", packetRecieved);
-				packets.at(packetRecieved).acknowledged = true;
+				if (packets.at(packetRecieved).sentOnce == true) {
+					packets.at(packetRecieved).acknowledged = true;
+				}
 				// MOVE WINDOW
 				if (windowBase == packetRecieved) {
 					if (packetRecieved != numPackets) {
