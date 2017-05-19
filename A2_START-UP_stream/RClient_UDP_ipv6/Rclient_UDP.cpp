@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 	//*******************************************************************
 	int counter = 0;
 	vector<packet> packets; // CONTAINER FOR PACKETS
-	packet closePacket = packet("CLOSE \r\n");
+	packet closePacket = packet((char *) "CLOSE \r\n");
 	int closeCount = 0;
 	char temp_buffer[BUFFER_SIZE];
 	FILE *fin=fopen("data_for_transmission.txt","rb"); //original
@@ -253,10 +253,11 @@ int main(int argc, char *argv[]) {
 		}
 		// SEND/RESEND Data Packets
 		else {
-			for (int i = windowBase; i < windowBase + WINDOW_SIZE; i++) {
+			for (int i = windowBase; i < windowBase + 3; i++) {
 				if (i > numPackets) { break; }
 				// If it hasn't been sent the first time and hasn't been acknowledged
 				if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
+					cout << "Sending window base = " << windowBase << endl;
 						//cout << "1) i is currently = " << i << endl;
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
@@ -269,6 +270,7 @@ int main(int argc, char *argv[]) {
 						// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
 						double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
 						if ( timeElapsed > 500 ) {
+							cout << "Sending window base = " << windowBase << endl;
 							printf("%f\n\n", timeElapsed);
 							strcpy(send_buffer, packets.at(i).packet_data);
 							// DEBUG:

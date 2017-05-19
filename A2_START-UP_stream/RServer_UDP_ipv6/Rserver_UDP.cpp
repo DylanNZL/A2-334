@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 	// Variables
 	 vector <tempData *> temp_buffer;
 	 vector <char *> write_buffer;
-	 int counter = 0;
+	 int windowBase = 0;
 	 FILE *fout = fopen("data_received.txt","w");
    while (1) {
 		addrlen = sizeof(clientAddress); //IPv4 & IPv6-compliant
@@ -273,22 +273,24 @@ int main(int argc, char *argv[]) {
 				printf("PACKET NUM: %d\n", packet_number);
 				printf("DATA: \"%s\"\n", data);*/
 				if (CRC == CRC_recv) {
-					if (packet_number == counter) {
+					cout << "Recieve window base = " << windowBase << endl;
+					if (packet_number == windowBase) {
 						write_buffer.push_back(data);
-						counter++;
+						windowBase++;
 						sprintf(send_buffer,"ACK %d \r\n",packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-					  // Check if any packets in temp_buffer can be added and counter moved up
+					  // Check if any packets in temp_buffer can be added and windowBase moved up
 						while (1) {
-							if (temp_buffer.size() != 0 && temp_buffer.front()->packetNumber == counter) {
+							if (temp_buffer.size() != 0 && temp_buffer.front()->packetNumber == windowBase) {
 							  write_buffer.push_back(temp_buffer.front()->data);
-							  counter ++;
+							  windowBase++;
 							  temp_buffer.erase(temp_buffer.begin());
 						  }
 						  else { break; }
 						}
-					} else if (packet_number > counter && packet_number <= counter + 3) {
+						cout << "Recieve window base after incrementing = " << windowBase << endl;
+					} else if (packet_number > windowBase && packet_number <= windowBase + 3) {
 						sprintf(send_buffer,"ACK %d \r\n",packet_number);
 					  //send ACK ureliably
 					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
@@ -309,7 +311,7 @@ int main(int argc, char *argv[]) {
 							temp->data = data;
 							temp_buffer.push_back(temp);
 						}
-					} else if (packet_number < counter && packet_number >= counter - 4) {
+					} else if (packet_number < windowBase && packet_number >= windowBase - 4) {
 						// Send ACK to catch sender up to where we are and the discard contents of packet
 						sprintf(send_buffer,"ACK %d \r\n",packet_number);
 					  //send ACK ureliably
