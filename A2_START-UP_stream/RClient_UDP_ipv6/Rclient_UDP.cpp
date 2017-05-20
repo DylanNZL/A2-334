@@ -57,12 +57,14 @@ using namespace std;
 //segment size, i.e., if fgets gets more than this number of bytes it segments the message into smaller parts.
 
 struct packet {
+	// string constructor
 	packet(char* mPacket) {
 		acknowledged = false;
 		sentOnce = false;
 		packet_data = mPacket;
 		resendTime = clock(); // TODO: SET TO CURRENT TIME SO THAT IT WILL NEED TO BE SENT?
 	}
+	// default constructor
 	packet() {
 	}
 	bool acknowledged;
@@ -88,14 +90,14 @@ unsigned int CRCpolynomial(char *buffer){
   unsigned int bufsize=strlen(buffer);
 
 	while(bufsize--!=0){
-		for(i = 0x80; i != 0; i /= 2){
-			if((rem&0x8000) != 0){
+		for(i = 0x80; i != 0; i /= 2) {
+			if ((rem&0x8000) != 0) {
 				rem = rem << 1;
 				rem ^= GENERATOR;
-			} else{
-	   	       rem = rem << 1;
-		    }
-	  		if((*buffer&i) != 0){
+			} else {
+	   	  rem = rem << 1;
+		  }
+	  	if ((*buffer&i) != 0) {
 			   rem ^= GENERATOR;
 			}
 		}
@@ -105,12 +107,11 @@ unsigned int CRCpolynomial(char *buffer){
 	return rem;
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
-//*******************************************************************
-// Initialization
-//*******************************************************************
+	//*******************************************************************
+	// Initialization
+	//*******************************************************************
 	struct sockaddr_storage localaddr, remoteaddr;
   char portNum[NI_MAXSERV];
   struct addrinfo *result = NULL;
@@ -158,8 +159,8 @@ int main(int argc, char *argv[]) {
 	s = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
 	if (s == INVALID_SOCKET) {
-	 printf("socket failed\n");
-	 exit(1);
+	  printf("socket failed\n");
+	  exit(1);
 	}
   // nonblocking option
 	// Set the socket I/O mode: In this case FIONBIO
@@ -184,23 +185,20 @@ int main(int argc, char *argv[]) {
 	//*******************************************************************
 	int counter = 0;
 	vector<packet> packets; // CONTAINER FOR PACKETS
-	packet closePacket = packet((char *) "CLOSE \r\n");
-	int closeCount = 0;
+	packet closePacket = packet((char *) "CLOSE \r\n"); // Packet containing close
+	int closeCount = 0; // Amount of times close has been sent
 	char temp_buffer[BUFFER_SIZE];
-	FILE *fin=fopen("data_for_transmission.txt","rb"); //original
-	if(fin == NULL) {
+	FILE *fin=fopen("data_for_transmission.txt","rb"); // original
+	if (fin == NULL) {
 		printf("cannot open data_for_transmission.txt\n");
 		closesocket(s);
 		WSACleanup();
 		exit(0);
-	} else {
-		printf("data_for_transmission.txt is now open for sending\n");
-  }
+	} else { printf("data_for_transmission.txt is now open for sending\n"); }
 
 	// READ IN FILE AND STORE AS PACKETS IN THE VECTOR
 	while(1) {
 		if (feof(fin)) { fclose(fin); break; }
-
 		fgets(temp_buffer, SEGMENT_SIZE, fin); // get one line of data from the file
 		strtok(temp_buffer, "'\r\n'"); // Remove /r/n
 		unsigned int CRC = CRCpolynomial(temp_buffer); // CRC
@@ -212,14 +210,13 @@ int main(int argc, char *argv[]) {
 		printf("COMMAND: Packet\n");
 		printf("DATA: \"%s\"\n", temp_buffer);
 		printf("PACKET: %s\n", temp_packet);*/
-
 		packet p = packet(temp_packet); // create a full packet struct
 		packets.push_back(p);
 		counter++;
 	}
 
 	int numPackets = counter - 1; // Take away one because it always increments the counter for the next packet.
-	int windowBase = 0;
+	int windowBase = 0; // Position of the sending window
 
 	while (1) {
 		memset(send_buffer, 0, sizeof(send_buffer));//clean up the send_buffer before reading the next line
@@ -227,6 +224,7 @@ int main(int argc, char *argv[]) {
 		/**
 		 * SEND
 		 */
+
 		// All packets are sent so send close and wait for ack to close socket
 		if (windowBase > numPackets) {
 			if (!closePacket.sentOnce) {
@@ -244,9 +242,7 @@ int main(int argc, char *argv[]) {
 			}
 			// If we've sent it more than 5 times give up
 			// NOTE could be more or less as we may miss the first ack and just delay closing
-			if (closeCount == 5) {
-				break;
-			}
+			if (closeCount == 5) { break; }
 		}
 		// SEND/RESEND Data Packets
 		else {
@@ -255,35 +251,35 @@ int main(int argc, char *argv[]) {
 				// If it hasn't been sent the first time and hasn't been acknowledged
 				if (packets.at(i).sentOnce == false && packets.at(i).acknowledged == false) {
 					cout << "Sending window base = " << windowBase << endl;
-						//cout << "1) i is currently = " << i << endl;
+					//cout << "1) i is currently = " << i << endl;
+					strcpy(send_buffer, packets.at(i).packet_data);
+					// DEBUG:
+					cout << "Sending: " << send_buffer << endl;
+					//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
+					send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
+					packets.at(i).sentOnce = true;
+					packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
+				} else {
+					// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
+					double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
+					if ( timeElapsed > 500 ) {
+						cout << "Sending window base = " << windowBase << endl;
+						printf("%f\n\n", timeElapsed);
 						strcpy(send_buffer, packets.at(i).packet_data);
 						// DEBUG:
-						cout << "Sending: " << send_buffer << endl;
+						cout << "Resending: " << send_buffer;
 						//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
 						send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-						packets.at(i).sentOnce = true;
-						packets.at(i).resendTime = clock(); // TODO: IS THIS RIGHT?
-					} else {
-						// IF THE STORED CLOCK - THE CURRENT CLOCK DIVIDED BY CLOCKS_PER_SEC IS MORE THAN 1 THEN 1 SEC HAS PASSED
-						double timeElapsed = (clock() - packets.at(i).resendTime) * 1000 / CLOCKS_PER_SEC;
-						if ( timeElapsed > 500 ) {
-							cout << "Sending window base = " << windowBase << endl;
-							printf("%f\n\n", timeElapsed);
-							strcpy(send_buffer, packets.at(i).packet_data);
-							// DEBUG:
-							cout << "Resending: " << send_buffer;
-							//cout << "calling send_unreliably, to deliver data of size " << strlen(send_buffer) << endl;
-							send_unreliably(s, send_buffer, (result->ai_addr)); //send the packet to the unreliable data channel
-							packets.at(i).resendTime = clock();
-						}
+						packets.at(i).resendTime = clock();
 					}
 				}
+			}
 		}
+
 		/**
-		 * RECIEVE
-		 */
-		// NOTE Don't think it is needed anymore
-		//Sleep(1);  // sleep for 1 millisecond
+		* RECIEVE
+		*/
+
 		addrlen = sizeof(remoteaddr); //IPv4 & IPv6-compliant
 		bytes = recvfrom(s, receive_buffer, 78, 0,(struct sockaddr*)&remoteaddr,&addrlen);
 		// IDENTIFY server's IP address and port number.
@@ -318,7 +314,6 @@ int main(int argc, char *argv[]) {
 					int CRC_recv = atoi(crc);
 					char * data_recv = strtok(NULL, "'\0'");
 					if (data_recv != NULL) {
-
 						int CRC_check = CRCpolynomial(data_recv);
 						cout << "CRC RECV " << CRC_recv << " DATA \"" << data_recv << "\" CRC CHECK " << CRC_check << endl;
 						if (CRC_check == CRC_recv) {
@@ -326,9 +321,7 @@ int main(int argc, char *argv[]) {
 								strncpy(temp_buffer, &data_recv[4], 10);
 								int packetRecieved = atoi(temp_buffer);
 								printf("Recieved acknowledgement for packet %d\n", packetRecieved);
-								if (packets.at(packetRecieved).sentOnce == true) {
-									packets.at(packetRecieved).acknowledged = true;
-								}
+								if (packets.at(packetRecieved).sentOnce == true) { packets.at(packetRecieved).acknowledged = true; }
 								// MOVE WINDOW
 								if (windowBase == packetRecieved) {
 									if (packetRecieved != numPackets) {
@@ -341,9 +334,7 @@ int main(int argc, char *argv[]) {
 											p++;
 										}
 									}
-									else {
-										windowBase++;
-									}
+									else { windowBase++; }
 								} else if (windowBase != packetRecieved) {
 										//cout << "packetRecieved= " << packetRecieved << endl;
 										packets.at(packetRecieved).acknowledged = true;

@@ -139,31 +139,30 @@ int main(int argc, char *argv[]) {
 //********************************************************************
 	struct sockaddr_storage clientAddress; //IPv4 & IPv6 -compliant
 	struct addrinfo *result = NULL;
-    struct addrinfo hints;
-		int iResult;
-    SOCKET s;
-    char send_buffer[BUFFER_SIZE],receive_buffer[BUFFER_SIZE];
-    int n,bytes,addrlen;
+  struct addrinfo hints;
+	int iResult;
+  SOCKET s;
+	char send_buffer[BUFFER_SIZE],receive_buffer[BUFFER_SIZE];
+  int n,bytes,addrlen;
+	memset(&hints, 0, sizeof(struct addrinfo));
 
-		memset(&hints, 0, sizeof(struct addrinfo));
-
-		hints.ai_family = AF_INET6;
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_protocol = IPPROTO_UDP;
-		hints.ai_flags = AI_PASSIVE; // For wildcard IP address
-    randominit();
-//********************************************************************
-// WSSTARTUP
-//********************************************************************
-   if (WSAStartup(WSVERS, &wsadata) != 0) {
-      WSACleanup();
-      printf("WSAStartup failed\n");
-   }
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	hints.ai_flags = AI_PASSIVE; // For wildcard IP address
+  randominit();
+	//********************************************************************
+	// WSSTARTUP
+	//********************************************************************
+  if (WSAStartup(WSVERS, &wsadata) != 0) {
+    WSACleanup();
+    printf("WSAStartup failed\n");
+  }
 
 	if (argc != ARG_COUNT) {
-	   printf("USAGE: Rserver_UDP localport allow_corrupted_bits(0 or 1) allow_packet_loss(0 or 1)\n");
-	   exit(1);
-   }
+		printf("USAGE: Rserver_UDP localport allow_corrupted_bits(0 or 1) allow_packet_loss(0 or 1)\n");
+	  exit(1);
+  }
 
 	iResult = getaddrinfo(NULL, argv[1], &hints, &result); //converts human-readable text strings representing hostnames or IP addresses
 	                                                        //into a dynamically allocated linked list of struct addrinfo structures
@@ -178,53 +177,52 @@ int main(int argc, char *argv[]) {
 //********************************************************************
 //SOCKET
 //********************************************************************
-   s = INVALID_SOCKET; //socket for listening
+  s = INVALID_SOCKET; //socket for listening
 	// Create a SOCKET for the server to listen for client connections
 
 	s = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
 	//check for errors in socket allocation
 	if (s == INVALID_SOCKET) {
-		 printf("Error at socket(): %d\n", WSAGetLastError());
-		 freeaddrinfo(result);
-		 WSACleanup();
-		 exit(1);//return 1;
+		printf("Error at socket(): %d\n", WSAGetLastError());
+		freeaddrinfo(result);
+		WSACleanup();
+		exit(1);//return 1;
 	}
-
-   packets_damagedbit=atoi(argv[2]);
-   packets_lostbit=atoi(argv[3]);
-   if (packets_damagedbit < 0 || packets_damagedbit > 1 || packets_lostbit < 0 || packets_lostbit > 1){
-	   printf("USAGE: Rserver_UDP localport allow_corrupted_bits(0 or 1) allow_packet_loss(0 or 1)\n");
-	   exit(0);
-   }
+  packets_damagedbit=atoi(argv[2]);
+  packets_lostbit=atoi(argv[3]);
+  if (packets_damagedbit < 0 || packets_damagedbit > 1 || packets_lostbit < 0 || packets_lostbit > 1) {
+	  printf("USAGE: Rserver_UDP localport allow_corrupted_bits(0 or 1) allow_packet_loss(0 or 1)\n");
+	  exit(0);
+  }
 	//********************************************************************
 	//BIND
 	//********************************************************************
-   iResult = bind( s, result->ai_addr, (int)result->ai_addrlen);
-    if (iResult == SOCKET_ERROR) {
-      printf("bind failed with error: %d\n", WSAGetLastError());
-      freeaddrinfo(result);
+  iResult = bind( s, result->ai_addr, (int)result->ai_addrlen);
+  if (iResult == SOCKET_ERROR) {
+    printf("bind failed with error: %d\n", WSAGetLastError());
+    freeaddrinfo(result);
 
-      closesocket(s);
-      WSACleanup();
-      return 1;
-    }
-    cout << "==============<< UDP SERVER >>=============" << endl;
-    cout << "channel can damage packets=" << packets_damagedbit << endl;
-    cout << "channel can lose packets=" << packets_lostbit << endl;
+    closesocket(s);
+    WSACleanup();
+    return 1;
+  }
+  cout << "==============<< UDP SERVER >>=============" << endl;
+  cout << "channel can damage packets=" << packets_damagedbit << endl;
+  cout << "channel can lose packets=" << packets_lostbit << endl;
 
-	 freeaddrinfo(result); //free the memory allocated by the getaddrinfo
+	freeaddrinfo(result); //free the memory allocated by the getaddrinfo
 	                       //function for the server's address, as it is
 	                       //no longer needed
 //********************************************************************
 //INFINITE LOOP
 //********************************************************************
 	// Variables
-	 vector <tempData *> temp_buffer;
-	 vector <char *> write_buffer;
-	 int windowBase = 0;
-	 FILE *fout = fopen("data_received.txt","w");
-   while (1) {
+	vector <tempData *> temp_buffer; // Hold out of order packets to add to the write buffer later
+	vector <char *> write_buffer; // Holds the data to write to file after socket close
+	int windowBase = 0; // Position of the recieve window
+	FILE *fout = fopen("data_received.txt","w");
+  while (1) {
 		addrlen = sizeof(clientAddress); //IPv4 & IPv6-compliant
 		memset(receive_buffer,0,sizeof(receive_buffer));
 		bytes = recvfrom(s, receive_buffer, SEGMENT_SIZE, 0, (struct sockaddr*)&clientAddress, &addrlen);
@@ -238,7 +236,7 @@ int main(int argc, char *argv[]) {
 		//PROCESS RECEIVED PACKET
 		//Remove trailing CR and LF
 		n = 0;
-		while(n < bytes){
+		while (n < bytes) {
 			n++;
 			if ((bytes < 0) || (bytes == 0)) break;
 			if (receive_buffer[n] == '\n') { /*end on a LF*/
@@ -251,31 +249,31 @@ int main(int argc, char *argv[]) {
 		if ((bytes < 0) || (bytes == 0)) break;
 		printf("\n================================================\n");
 		printf("RECEIVED --> %s \n",receive_buffer);
-			if (strncmp(receive_buffer,"CLOSE",5)==0)  {//if client says "CLOSE", the last packet for the file was sent. Close the file
-				// Remember that the packet carrying "CLOSE" may be lost or damaged as well!
-				sprintf(send_buffer,"CLOSE ACK\r\n");
-				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-				closesocket(s);
-				printf("Closing the socket connection and Exiting...\n");
-				break;
-			}
-			else {
-				int CRC_recv = 0;
-				char *command;
-				int packet_number = 0;
-				char *data;
-				extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
-				int CRC = CRCpolynomial(data);
-				// DEBUG:
-			 /* printf ("CRC RECIEVED: %d\n", CRC_recv);
-				printf("CRC FROM DATA: %d\n", CRC);
-				printf("COMMAND: %s\n",command);
-				printf("PACKET NUM: %d\n", packet_number);
-				printf("DATA: \"%s\"\n", data);*/
-				char * crc = new char[10];
-				if (CRC == CRC_recv) {
-					cout << "Recieve window base = " << windowBase << endl;
-					if (packet_number == windowBase) {
+		if (strncmp(receive_buffer,"CLOSE",5)==0)  {//if client says "CLOSE", the last packet for the file was sent. Close the file
+			// Remember that the packet carrying "CLOSE" may be lost or damaged as well!
+			sprintf(send_buffer,"CLOSE ACK\r\n");
+			send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+			closesocket(s);
+			printf("Closing the socket connection and Exiting...\n");
+			break;
+		}
+		else {
+			int CRC_recv = 0;
+			char *command;
+			int packet_number = 0;
+			char *data;
+			extractTokens(receive_buffer, CRC_recv, command, packet_number, data);
+			int CRC = CRCpolynomial(data);
+			// DEBUG:
+			/*printf ("CRC RECIEVED: %d\n", CRC_recv);
+			printf("CRC FROM DATA: %d\n", CRC);
+			printf("COMMAND: %s\n",command);
+			printf("PACKET NUM: %d\n", packet_number);
+			printf("DATA: \"%s\"\n", data);*/
+			char * crc = new char[10];
+			if (CRC == CRC_recv) {
+				cout << "Recieve window base = " << windowBase << endl;
+				if (packet_number == windowBase) {
 						write_buffer.push_back(data);
 						windowBase++;
 						sprintf(crc, "ACK %d", packet_number);
@@ -294,21 +292,21 @@ int main(int argc, char *argv[]) {
 						}
 						cout << "Recieve window base after incrementing = " << windowBase << endl;
 					} else if (packet_number > windowBase && packet_number <= windowBase + 3) {
-						sprintf(crc, "ACK %d", packet_number);
-						int crc_send = CRCpolynomial(crc);
-						sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
-					  //send ACK ureliably
-					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-						unsigned int j = 0; bool add = true;
-						// Check that the packet isn't already waiting to be put into write buffer (we've recieced it already)
-						while (temp_buffer.size() > j) {
+					sprintf(crc, "ACK %d", packet_number);
+					int crc_send = CRCpolynomial(crc);
+					sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
+					 //send ACK ureliably
+					 send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+					unsigned int j = 0; bool add = true;
+					// Check that the packet isn't already waiting to be put into write buffer (we've recieced it already)
+					while (temp_buffer.size() > j) {
 							if (temp_buffer.at(j)->packetNumber == packet_number) {
 								add = false;
 								break;
 							}
 							j++;
 						}
-						if (add) {
+					if (add) {
 							// Add value to temp buffer
 							tempData *temp = new tempData;
 							temp->packetNumber = packet_number;
@@ -316,43 +314,42 @@ int main(int argc, char *argv[]) {
 							temp->data = data;
 							temp_buffer.push_back(temp);
 						}
-					} else if (packet_number < windowBase && packet_number >= windowBase - 4) {
-						// Send ACK to catch sender up to where we are and the discard contents of packet
-						sprintf(crc, "ACK %d", packet_number);
-						int crc_send = CRCpolynomial(crc);
-						sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
-					  //send ACK ureliably
-					  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-					}
-			 } else {
+				} else if (packet_number < windowBase && packet_number >= windowBase - 4) {
+					// Send ACK to catch sender up to where we are and the discard contents of packet
+					sprintf(crc, "ACK %d", packet_number);
+					int crc_send = CRCpolynomial(crc);
+					sprintf(send_buffer,"%d ACK %d\r\n", crc_send, packet_number);
+				  //send ACK ureliably
+				  send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
+				}
+			} else {
 				// DAMAGED PACKET
 				sprintf(crc, "NAK %d", packet_number);
 				int crc_send = CRCpolynomial(crc);
 				sprintf(send_buffer,"%d NAK %d\r\n", crc_send, packet_number);
 				//send ACK ureliably
 				send_unreliably(s,send_buffer,(sockaddr*)&clientAddress );
-			 }
-	 	 }
-   }
-   closesocket(s);
-	 //store the packet's data into a file
-	 if (write_buffer.size() != 0) {
-		 vector<char *>::iterator it;
-		 for (it = write_buffer.begin(); it != write_buffer.end(); ++it) {
-			 char * toWrite = new char[strlen(*it)];
-			 toWrite = (*it);
-			 fprintf(fout, "%s\n", toWrite);
-			 // DEBUG:
-			 printf("Wrote to file: \"%s\"\n", toWrite);
-		 }
-		 printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
-	 }
-	 fclose(fout);
-   cout << "==============<< STATISTICS >>=============" << endl;
-   cout << "numOfPacketsDamaged=" << numOfPacketsDamaged << endl;
-   cout << "numOfPacketsLost=" << numOfPacketsLost << endl;
-   cout << "numOfPacketsUncorrupted=" << numOfPacketsUncorrupted << endl;
-   cout << "===========================================" << endl;
-
-   exit(0);
+			}
+	 	}
+  }
+  closesocket(s);
+	//store the packet's data into a file
+	if (write_buffer.size() != 0) {
+		vector<char *>::iterator it;
+		for (it = write_buffer.begin(); it != write_buffer.end(); ++it) {
+			char * toWrite = new char[strlen(*it)];
+			toWrite = (*it);
+			fprintf(fout, "%s\n", toWrite);
+			// DEBUG:
+			printf("Wrote to file: \"%s\"\n", toWrite);
+		}
+		printf("Server saved data_received.txt \n"); // you have to manually check to see if this file is identical to file1_Windows.txt
+	}
+	fclose(fout);
+  cout << "==============<< STATISTICS >>=============" << endl;
+  cout << "numOfPacketsDamaged=" << numOfPacketsDamaged << endl;
+  cout << "numOfPacketsLost=" << numOfPacketsLost << endl;
+  cout << "numOfPacketsUncorrupted=" << numOfPacketsUncorrupted << endl;
+  cout << "===========================================" << endl;
+  exit(0);
 }
